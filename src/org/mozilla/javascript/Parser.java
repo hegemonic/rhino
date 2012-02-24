@@ -120,6 +120,7 @@ public class Parser
     // during function parsing.  See PerFunctionVariables class below.
     ScriptNode currentScriptOrFn;
     Scope currentScope;
+    int nestingOfWith;
     private int endFlags;
     private boolean inForInit;  // bound temporarily during forStatement()
     private Map<String,LabeledStatement> labelSet;
@@ -239,7 +240,7 @@ public class Parser
             ? ScriptRuntime.getMessage0(messageId)
             : ScriptRuntime.getMessage1(messageId, messageArg);
     }
-
+    
     void reportError(String messageId) {
         reportError(messageId, null);
     }
@@ -332,6 +333,7 @@ public class Parser
                 lineno++;
                 sawEOL = true;
             } else {
+                sawEOL = false;
                 if (compilerEnv.isRecordingComments()) {
                     recordComment(lineno);
                 }
@@ -539,7 +541,7 @@ public class Parser
 
         int baseLineno = ts.lineno;  // line number where source starts
         int end = pos;  // in case source is empty
-
+        
         boolean inDirectivePrologue = true;
         boolean savedStrictMode = inUseStrictDirective;
         // TODO: eval code should get strict mode from invoking code
@@ -626,11 +628,11 @@ public class Parser
         ++nestingOfFunction;
         int pos = ts.tokenBeg;
         Block pn = new Block(pos);  // starts at LC position
-
+        
         boolean inDirectivePrologue = true;
         boolean savedStrictMode = inUseStrictDirective;
         // Don't set 'inUseStrictDirective' to false: inherit strict mode.
-
+        
         pn.setLineno(ts.lineno);
         try {
             bodyLoop: for (;;) {
@@ -674,7 +676,7 @@ public class Parser
         pn.setLength(end - pos);
         return pn;
     }
-
+    
     private String getDirective(AstNode n) {
         if (n instanceof ExpressionStatement) {
             AstNode e = ((ExpressionStatement) n).getExpression();
@@ -779,7 +781,7 @@ public class Parser
             if (inUseStrictDirective) {
                 String id = name.getIdentifier();
                 if ("eval".equals(id)|| "arguments".equals(id)) {
-                    reportError("msg.bad.id.strict", id);
+                    reportError("msg.bad.id.strict", id);                
                 }
             }
             if (!matchToken(Token.LP)) {
@@ -817,6 +819,15 @@ public class Parser
         fnNode.setFunctionType(type);
         if (lpPos != -1)
             fnNode.setLp(lpPos - functionSourceStart);
+
+        if (insideFunction() || nestingOfWith > 0) {
+            // 1. Nested functions are not affected by the dynamic scope flag
+            //    as dynamic scope is already a parent of their scope.
+            // 2. Functions defined under the with statement also immune to
+            //    this setup, in which case dynamic scope is ignored in favor
+            //    of the with object.
+            fnNode.setIgnoreDynamicScope();
+        }
 
         fnNode.setJsDoc(getAndResetJsDoc());
 
@@ -1605,7 +1616,13 @@ public class Parser
         if (mustMatchToken(Token.RP, "msg.no.paren.after.with"))
             rp = ts.tokenBeg;
 
-        AstNode body = statement();
+        ++nestingOfWith;
+        AstNode body;
+        try {
+            body = statement();
+        } finally {
+            --nestingOfWith;
+        }
 
         WithStatement pn = new WithStatement(pos, getNodeEnd(body) - pos);
         pn.setJsDoc(getAndResetJsDoc());
@@ -1828,11 +1845,7 @@ public class Parser
             }
         }
 
-        // If stmt has parent assigned its position already is relative
-        // (See bug #710225)
-        bundle.setLength(stmt.getParent() == null
-                     ? getNodeEnd(stmt) - pos
-                     : getNodeEnd(stmt));
+        bundle.setLength(getNodeEnd(stmt) - pos);
         bundle.setStatement(stmt);
         return bundle;
     }
@@ -1883,7 +1896,7 @@ public class Parser
                     String id = ts.getString();
                     if ("eval".equals(id) || "arguments".equals(ts.getString()))
                     {
-                        reportError("msg.bad.id.strict", id);
+                        reportError("msg.bad.id.strict", id);                    
                     }
                 }
                 defineSymbol(declType, ts.getString(), inForInit);
@@ -2425,7 +2438,7 @@ public class Parser
         } finally {
             inForInit = wasInForInit;
         }
-
+        
         mustMatchToken(Token.RP, "msg.no.paren.arg");
         return result;
     }
@@ -2821,7 +2834,7 @@ public class Parser
                                        s,
                                        ts.getNumber());
           }
-
+          
           case Token.STRING:
               return createStringLiteral();
 
@@ -2944,14 +2957,14 @@ public class Parser
                                           (after_lb_or_comma ? 1 : 0));
                 pn.setSkipCount(skipCount);
                 if (afterComma != -1)
-                    warnTrailingComma(pos, elements, afterComma);
+                    warnTrailingComma("msg.array.trailing.comma",
+                                      pos, elements, afterComma);
                 break;
             } else if (tt == Token.FOR && !after_lb_or_comma
                        && elements.size() == 1) {
                 return arrayComprehension(elements.get(0), pos);
             } else if (tt == Token.EOF) {
                 reportError("msg.no.bracket.arg");
-                break;
             } else {
                 if (!after_lb_or_comma) {
                     reportError("msg.no.bracket.arg");
@@ -3080,6 +3093,7 @@ public class Parser
             switch(tt) {
               case Token.NAME:
               case Token.STRING:
+                  afterComma = -1;
                   saveNameTokenData(ts.tokenBeg, ts.getString(), ts.lineno);
                   consumeToken();
                   StringLiteral stringProp = null;
@@ -3091,7 +3105,7 @@ public class Parser
                   int ppos = ts.tokenBeg;
 
                   if ((tt == Token.NAME
-                       && (peekToken() == Token.NAME || convertToName(peekToken()))
+                       && peekToken() == Token.NAME
                        && ("get".equals(propertyName) || "set".equals(propertyName))))
                   {
                       consumeToken();
@@ -3110,6 +3124,7 @@ public class Parser
 
               case Token.NUMBER:
                   consumeToken();
+                  afterComma = -1;
                   AstNode nl = new NumberLiteral(ts.tokenBeg,
                                                  ts.getString(),
                                                  ts.getNumber());
@@ -3119,22 +3134,29 @@ public class Parser
                   break;
 
               case Token.RC:
-                  if (afterComma != -1)
-                      warnTrailingComma(pos, elems, afterComma);
+                  if (afterComma != -1 && compilerEnv.getWarnTrailingComma())
+                      warnTrailingComma("msg.extra.trailing.comma",
+                                        pos, elems, afterComma);
                   break commaLoop;
 
               default:
-                  if (convertToName(tt)) {
-                      consumeToken();
-                      AstNode pname = createNameNode();
-                      pname.setJsDoc(jsdoc);
-                      elems.add(plainProperty(pname, tt));
-                      break;
+                  if (compilerEnv.isReservedKeywordAsIdentifier()) {
+                      // convert keyword to property name, e.g. ({if: 1})
+                      propertyName = Token.keywordToName(tt);
+                      if (propertyName != null) {
+                          afterComma = -1;
+                          saveNameTokenData(ts.tokenBeg, propertyName, ts.lineno);
+                          consumeToken();
+                          AstNode pname = createNameNode();
+                          pname.setJsDoc(jsdoc);
+                          elems.add(plainProperty(pname, tt));
+                          break;
+                      }
                   }
                   reportError("msg.bad.prop");
                   break;
             }
-
+            
             if (this.inUseStrictDirective) {
                 if (propertyNames.contains(propertyName)) {
                     addError("msg.dup.obj.lit.prop.strict", propertyName);
@@ -3144,7 +3166,8 @@ public class Parser
 
             // Eat any dangling jsdoc in the property.
             getAndResetJsDoc();
-
+            jsdoc = null;
+            
             if (matchToken(Token.COMMA)) {
                 afterComma = ts.tokenEnd;
             } else {
@@ -3326,18 +3349,6 @@ public class Parser
         prevNameTokenLineno = lineno;
     }
 
-    // Check whether token is a reserved keyword that is allowed as property id.
-    private boolean convertToName(int token) {
-        if (compilerEnv.isReservedKeywordAsIdentifier()) {
-            String conv = Token.keywordToName(token);
-            if (conv != null) {
-                saveNameTokenData(ts.tokenBeg, conv, ts.lineno);
-                return true;
-            }
-        }
-        return false;
-    }
-
     /**
      * Return the file offset of the beginning of the input source line
      * containing the passed position.
@@ -3384,7 +3395,8 @@ public class Parser
         }
     }
 
-    private void warnTrailingComma(int pos, List<?> elems, int commaPos) {
+    private void warnTrailingComma(String messageId, int pos,
+                                   List<?> elems, int commaPos) {
         if (compilerEnv.getWarnTrailingComma()) {
             // back up from comma to beginning of line or array/objlit
             if (!elems.isEmpty()) {
@@ -3416,6 +3428,7 @@ public class Parser
     {
         private ScriptNode savedCurrentScriptOrFn;
         private Scope savedCurrentScope;
+        private int savedNestingOfWith;
         private int savedEndFlags;
         private boolean savedInForInit;
         private Map<String,LabeledStatement> savedLabelSet;
@@ -3428,6 +3441,9 @@ public class Parser
 
             savedCurrentScope = Parser.this.currentScope;
             Parser.this.currentScope = fnNode;
+
+            savedNestingOfWith = Parser.this.nestingOfWith;
+            Parser.this.nestingOfWith = 0;
 
             savedLabelSet = Parser.this.labelSet;
             Parser.this.labelSet = null;
@@ -3448,6 +3464,7 @@ public class Parser
         void restore() {
             Parser.this.currentScriptOrFn = savedCurrentScriptOrFn;
             Parser.this.currentScope = savedCurrentScope;
+            Parser.this.nestingOfWith = savedNestingOfWith;
             Parser.this.labelSet = savedLabelSet;
             Parser.this.loopSet = savedLoopSet;
             Parser.this.loopAndSwitchSet = savedLoopAndSwitchSet;
@@ -3507,12 +3524,6 @@ public class Parser
               break;
           case Token.GETPROP:
           case Token.GETELEM:
-              switch (variableType) {
-                  case Token.CONST:
-                  case Token.LET:
-                  case Token.VAR:
-                      reportError("msg.bad.assign.left");
-              }
               comma.addChildToBack(simpleAssignment(left, createName(tempName)));
               break;
           default:
@@ -3755,7 +3766,7 @@ public class Parser
     }
 
     // throw a failed-assertion with some helpful debugging info
-    private RuntimeException codeBug()
+    private RuntimeException codeBug() 
         throws RuntimeException
     {
         throw Kit.codeBug("ts.cursor=" + ts.cursor

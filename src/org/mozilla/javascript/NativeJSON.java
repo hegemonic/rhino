@@ -144,7 +144,7 @@ final class NativeJSON extends IdScriptableObject
         return new JsonParser(cx, scope).parseValue(jtext);
       } catch (JsonParser.ParseException ex) {
         throw ScriptRuntime.constructError("SyntaxError", ex.getMessage());
-      }
+      } 
     }
 
     public static Object parse(Context cx, Scriptable scope, String jtext,
@@ -179,18 +179,18 @@ final class NativeJSON extends IdScriptableObject
                     }
                 }
             } else {
-                Object[] keys = val.getIds();
+                Object[] keys = val.getIds(); 
                 for (Object p : keys) {
                     Object newElement = walk(cx, scope, reviver, val, p);
                     if (newElement == Undefined.instance) {
-                        if (p instanceof Number)
+                        if (p instanceof Number) 
                           val.delete(((Number) p).intValue());
-                        else
+                        else 
                           val.delete((String) p);
                     } else {
-                        if (p instanceof Number)
+                        if (p instanceof Number) 
                           val.put(((Number) p).intValue(), val, newElement);
-                        else
+                        else 
                           val.put((String) p, val, newElement);
                     }
                 }
@@ -251,7 +251,7 @@ final class NativeJSON extends IdScriptableObject
             if (v instanceof String || v instanceof Number) {
               propertyList.add(v);
             } else if (v instanceof NativeString || v instanceof NativeNumber) {
-              propertyList.add(ScriptRuntime.toString(v));
+              propertyList.add(ScriptRuntime.toString(v)); 
             }
           }
         }
@@ -316,7 +316,7 @@ final class NativeJSON extends IdScriptableObject
             value = ScriptRuntime.toNumber(value);
         } else if (value instanceof NativeString) {
             value = ScriptRuntime.toString(value);
-        } else if (value instanceof NativeBoolean) {
+        } else if (value instanceof NativeBoolean) { 
             value = ((NativeBoolean) value).getDefaultValue(ScriptRuntime.BooleanClass);
         }
 
@@ -324,8 +324,8 @@ final class NativeJSON extends IdScriptableObject
         if (value.equals(Boolean.TRUE)) return "true";
         if (value.equals(Boolean.FALSE)) return "false";
 
-        if (value instanceof CharSequence) {
-            return quote(value.toString());
+        if (value instanceof String) {
+            return quote((String) value);
         }
 
         if (value instanceof Number) {

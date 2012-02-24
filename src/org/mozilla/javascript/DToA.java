@@ -64,6 +64,12 @@ import java.math.BigInteger;
 class DToA {
 
 
+/* "-0.0000...(1073 zeros after decimal point)...0001\0" is the longest string that we could produce,
+ * which occurs when printing -5e-324 in binary.  We could compute a better estimate of the size of
+ * the output string and malloc fewer bytes depending on d and base, but why bother? */
+
+    private static final int DTOBASESTR_BUFFER_SIZE = 1078;
+
     private static char BASEDIGIT(int digit) {
         return (char)((digit >= 10) ? 'a' - 10 + digit : '0' + digit);
     }
@@ -297,13 +303,14 @@ class DToA {
         } else {
             /* We have a fraction. */
 
-            StringBuilder buffer;       /* The output string */
+            char[] buffer;       /* The output string */
+            int p;               /* index to current position in the buffer */
             int digit;
             double df;           /* The fractional part of d */
             BigInteger b;
 
-            buffer = new StringBuilder();
-            buffer.append(intDigits).append('.');
+            buffer = new char[DTOBASESTR_BUFFER_SIZE];
+            p = 0;
             df = d - dfloor;
 
             long dBits = Double.doubleToLongBits(d);
@@ -383,10 +390,14 @@ class DToA {
                     done = true;
                 }
 //                JS_ASSERT(digit < (uint32)base);
-                buffer.append(BASEDIGIT(digit));
+                buffer[p++] = BASEDIGIT(digit);
             } while (!done);
 
-            return buffer.toString();
+            StringBuffer sb = new StringBuffer(intDigits.length() + 1 + p);
+            sb.append(intDigits);
+            sb.append('.');
+            sb.append(buffer, 0, p);
+            return sb.toString();
         }
 
     }
@@ -451,7 +462,7 @@ class DToA {
         return b.multiply(BigInteger.valueOf(5).pow(k));
     }
 
-    static boolean roundOff(StringBuilder buf)
+    static boolean roundOff(StringBuffer buf)
     {
         int i = buf.length();
         while (i != 0) {
@@ -476,7 +487,7 @@ class DToA {
      * bufsize should be two greater than the maximum number of output characters expected. */
     static int
     JS_dtoa(double d, int mode, boolean biasUp, int ndigits,
-                    boolean[] sign, StringBuilder buf)
+                    boolean[] sign, StringBuffer buf)
     {
         /*  Arguments ndigits, decpt, sign are similar to those
             of ecvt and fcvt; trailing zeros are suppressed from
@@ -574,9 +585,7 @@ class DToA {
         else {
             /* d is denormalized */
             i = bbits[0] + be[0] + (Bias + (P-1) - 1);
-            x = (i > 32)
-                    ? ((long) word0(d)) << (64 - i) | word1(d) >>> (i - 32)
-                    : ((long) word1(d)) << (32 - i);
+            x = (i > 32) ? word0(d) << (64 - i) | word1(d) >>> (i - 32) : word1(d) << (32 - i);
 //            d2 = x;
 //            word0(d2) -= 31*Exp_msk1; /* adjust exponent */
             d2 = setWord0(x, word0(x) - 31*Exp_msk1);
@@ -784,7 +793,7 @@ class DToA {
                             }
                             else
                                 if (d < 0.5 - eps) {
-                                    stripTrailingZeroes(buf);
+                                    stripTrailingZeroes(buf);                                    
 //                                    while(*--s == '0') ;
 //                                    s++;
                                     return k + 1;
@@ -1142,8 +1151,8 @@ class DToA {
         return k + 1;
     }
 
-    private static void
-    stripTrailingZeroes(StringBuilder buf)
+    private static void 
+    stripTrailingZeroes(StringBuffer buf)
     {
 //      while(*--s == '0') ;
 //      s++;
@@ -1163,7 +1172,7 @@ class DToA {
         2};  /* DTOSTR_PRECISION */
 
     static void
-    JS_dtostr(StringBuilder buffer, int mode, int precision, double d)
+    JS_dtostr(StringBuffer buffer, int mode, int precision, double d)
     {
         int decPt;                                    /* Position of decimal point relative to first digit returned by JS_dtoa */
         boolean[] sign = new boolean[1];            /* true if the sign bit was set in d */

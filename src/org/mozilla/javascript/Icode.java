@@ -54,9 +54,6 @@ abstract class Icode {
 
     static final int
 
-    // delete operator used on a name
-        Icode_DELNAME                    = 0,
-
     // Stack: ... value1 -> ... value1 value1
         Icode_DUP                       = -1,
 
@@ -147,7 +144,7 @@ abstract class Icode {
         Icode_GETVAR1                   = -48,
         Icode_SETVAR1                   = -49,
 
-    // Load undefined
+    // Load unefined
         Icode_UNDEF                     = -50,
         Icode_ZERO                      = -51,
         Icode_ONE                       = -52,
@@ -266,7 +263,7 @@ abstract class Icode {
 
     static boolean validIcode(int icode)
     {
-        return MIN_ICODE <= icode && icode <= 0;
+        return MIN_ICODE <= icode && icode <= -1;
     }
 
     static boolean validTokenCode(int token)

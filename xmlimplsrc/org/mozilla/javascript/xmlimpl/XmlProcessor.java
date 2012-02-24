@@ -39,14 +39,12 @@ package org.mozilla.javascript.xmlimpl;
 import org.w3c.dom.*;
 
 import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.ParserConfigurationException;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.util.List;
 import java.util.ArrayList;
-import java.util.concurrent.LinkedBlockingDeque;
 
 import org.mozilla.javascript.*;
 
@@ -56,9 +54,9 @@ import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXParseException;
 
 class XmlProcessor implements Serializable {
-
+    
     private static final long serialVersionUID = 6903514433204808713L;
-
+    
     private boolean ignoreComments;
     private boolean ignoreProcessingInstructions;
     private boolean ignoreWhitespace;
@@ -67,7 +65,7 @@ class XmlProcessor implements Serializable {
 
     private transient javax.xml.parsers.DocumentBuilderFactory dom;
     private transient javax.xml.transform.TransformerFactory xform;
-    private transient LinkedBlockingDeque<DocumentBuilder> documentBuilderPool;
+    private transient DocumentBuilder documentBuilder;
     private RhinoSAXErrorHandler errorHandler = new RhinoSAXErrorHandler();
 
     private void readObject(ObjectInputStream stream) throws IOException, ClassNotFoundException {
@@ -76,10 +74,8 @@ class XmlProcessor implements Serializable {
         this.dom.setNamespaceAware(true);
         this.dom.setIgnoringComments(false);
         this.xform = javax.xml.transform.TransformerFactory.newInstance();
-        int poolSize = Runtime.getRuntime().availableProcessors() * 2;
-        this.documentBuilderPool = new LinkedBlockingDeque<DocumentBuilder>(poolSize);
     }
-
+    
     private static class RhinoSAXErrorHandler implements ErrorHandler, Serializable {
 
         private static final long serialVersionUID = 6918417235413084055L;
@@ -108,8 +104,6 @@ class XmlProcessor implements Serializable {
         this.dom.setNamespaceAware(true);
         this.dom.setIgnoringComments(false);
         this.xform = javax.xml.transform.TransformerFactory.newInstance();
-        int poolSize = Runtime.getRuntime().availableProcessors() * 2;
-        this.documentBuilderPool = new LinkedBlockingDeque<DocumentBuilder>(poolSize);
     }
 
     final void setDefault() {
@@ -180,26 +174,31 @@ class XmlProcessor implements Serializable {
     private javax.xml.parsers.DocumentBuilderFactory getDomFactory() {
         return dom;
     }
-
-    // Get from pool, or create one without locking, if needed.
-    private DocumentBuilder getDocumentBuilderFromPool()
-            throws ParserConfigurationException {
-        DocumentBuilder builder = documentBuilderPool.pollFirst();
-        if (builder == null){
-            builder = getDomFactory().newDocumentBuilder();
+    
+    private synchronized DocumentBuilder getDocumentBuilderFromPool()
+        throws javax.xml.parsers.ParserConfigurationException
+    {
+        DocumentBuilder result;
+        if (documentBuilder == null) {
+            javax.xml.parsers.DocumentBuilderFactory factory = getDomFactory();
+            result = factory.newDocumentBuilder();
+        } else {
+            result = documentBuilder;
+            documentBuilder = null;
         }
-        builder.setErrorHandler(errorHandler);
-        return builder;
+        result.setErrorHandler(errorHandler);
+        return result;
     }
-
-    // Insert into pool, if resettable. Pool capacity is limited to
-    // number of processors * 2.
-    private void returnDocumentBuilderToPool(DocumentBuilder db) {
-        try {
-            db.reset();
-            documentBuilderPool.offerFirst(db);
-        } catch (UnsupportedOperationException e) {
-            // document builders that don't support reset() can't be pooled
+        
+    private synchronized void returnDocumentBuilderToPool(DocumentBuilder db) {
+        if (documentBuilder == null) {
+            try {
+                db.reset();
+                documentBuilder = db;
+            } catch (UnsupportedOperationException e) {
+                // document builders that don't support reset() can't
+                // be pooled
+            }
         }
     }
 
@@ -253,7 +252,7 @@ class XmlProcessor implements Serializable {
         try {
             String syntheticXml = "<parent xmlns=\"" + defaultNamespaceUri +
                 "\">" + xml + "</parent>";
-            builder = getDocumentBuilderFromPool();
+            builder = getDocumentBuilderFromPool(); 
             Document document = builder.parse( new org.xml.sax.InputSource(new java.io.StringReader(syntheticXml)) );
             if (ignoreProcessingInstructions) {
                 List<Node> list = new java.util.ArrayList<Node>();

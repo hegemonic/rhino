@@ -68,7 +68,9 @@ final class Arguments extends IdScriptableObject
         calleeObj = f;
 
         Scriptable topLevel = getTopLevelScope(parent);
-        constructor = getProperty(topLevel, "Object");
+        objectCtor = (BaseFunction) getProperty(topLevel, "Object");
+
+        constructor = objectCtor;
 
         int version = f.getLanguageVersion();
         if (version <= Context.VERSION_1_3
@@ -92,7 +94,7 @@ final class Arguments extends IdScriptableObject
     }
 
     // the following helper methods assume that 0 < index < args.length
-
+    
     private void putIntoActivation(int index, Object value) {
         String argName = activation.function.getParamOrVarName(index);
         activation.put(argName, activation, value);
@@ -106,7 +108,7 @@ final class Arguments extends IdScriptableObject
     private void replaceArg(int index, Object value) {
       if (sharedWithActivation(index)) {
         putIntoActivation(index, value);
-      }
+      } 
       synchronized (this) {
         if (args == activation.originalArgs) {
           args = args.clone();
@@ -178,7 +180,7 @@ final class Arguments extends IdScriptableObject
         if (arg(index) == NOT_FOUND) {
           super.put(index, start, value);
         } else {
-          replaceArg(index, value);
+          replaceArg(index, value); 
         }
     }
 
@@ -187,7 +189,7 @@ final class Arguments extends IdScriptableObject
     {
         if (0 <= index && index < args.length) {
           removeArg(index);
-        }
+        } 
         super.delete(index);
     }
 
@@ -313,7 +315,7 @@ final class Arguments extends IdScriptableObject
             }
             if (!getAll) { // avoid adding args which were redefined to non-enumerable
               for (int i = 0; i < present.length; i++) {
-                if (!present[i] && super.has(i, this)) {
+                if (!present[i] && super.has(i, this)) { 
                   present[i] = true;
                   extraCount--;
                 }
@@ -346,7 +348,7 @@ final class Arguments extends IdScriptableObject
       Object value = arg(index);
       if (value == NOT_FOUND) {
         return super.getOwnPropertyDescriptor(cx, id);
-      }
+      } 
       if (sharedWithActivation(index)) {
         value = getFromActivation(index);
       }
@@ -362,10 +364,8 @@ final class Arguments extends IdScriptableObject
     }
 
     @Override
-    protected void defineOwnProperty(Context cx, Object id,
-                                     ScriptableObject desc,
-                                     boolean checkValid) {
-      super.defineOwnProperty(cx, id, desc, checkValid);
+    public void defineOwnProperty(Context cx, Object id, ScriptableObject desc) {
+      super.defineOwnProperty(cx, id, desc);
 
       double d = ScriptRuntime.toNumber(id);
       int index = (int) d;
@@ -400,6 +400,8 @@ final class Arguments extends IdScriptableObject
     private Object constructor;
 
     private NativeCall activation;
+
+    private BaseFunction objectCtor; 
 
 // Initially args holds activation.getOriginalArgs(), but any modification
 // of its elements triggers creation of a copy. If its element holds NOT_FOUND,

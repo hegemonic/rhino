@@ -140,44 +140,24 @@ public class VMBridge_jdk13 extends VMBridge
                                      Method method,
                                      Object[] args)
                 {
-                    // In addition to methods declared in the interface, proxies
-                    // also route some java.lang.Object methods through the
-                    // invocation handler.
-                    if (method.getDeclaringClass() == Object.class) {
-                        String methodName = method.getName();
-                        if (methodName.equals("equals")) {
-                            Object other = args[0];
-                            // Note: we could compare a proxy and its wrapped function
-                            // as equal here but that would break symmetry of equal().
-                            // The reason == suffices here is that proxies are cached
-                            // in ScriptableObject (see NativeJavaObject.coerceType())
-                            return Boolean.valueOf(proxy == other);
-                        }
-                        if (methodName.equals("hashCode")) {
-                            return Integer.valueOf(target.hashCode());
-                        }
-                        if (methodName.equals("toString")) {
-                            return "Proxy[" + target.toString() + "]";
-                        }
-                    }
-                    return adapter.invoke(cf, target, topScope, proxy, method, args);
+                    return adapter.invoke(cf, target, topScope, method, args);
                 }
             };
         Object proxy;
         try {
-            proxy = c.newInstance(handler);
+            proxy = c.newInstance(new Object[] { handler });
         } catch (InvocationTargetException ex) {
             throw Context.throwAsScriptRuntimeEx(ex);
         } catch (IllegalAccessException ex) {
-            // Should not happen
+            // Shouls not happen
             throw Kit.initCause(new IllegalStateException(), ex);
         } catch (InstantiationException ex) {
-            // Should not happen
+            // Shouls not happen
             throw Kit.initCause(new IllegalStateException(), ex);
         }
         return proxy;
     }
-
+    
     @Override
     protected boolean isVarArgs(Member member) {
       return false;

@@ -43,7 +43,6 @@ import java.io.Serializable;
 
 import org.mozilla.javascript.*;
 import org.mozilla.javascript.xml.*;
-import org.xml.sax.SAXException;
 
 public final class XMLLibImpl extends XMLLib implements Serializable {
     private static final long serialVersionUID = 1L;
@@ -73,7 +72,7 @@ public final class XMLLibImpl extends XMLLib implements Serializable {
             lib.exportToScope(sealed);
         }
     }
-
+    
     public void setIgnoreComments(boolean b) {
         options.setIgnoreComments(b);
     }
@@ -145,10 +144,8 @@ public final class XMLLibImpl extends XMLLib implements Serializable {
     private void exportToScope(boolean sealed) {
         xmlPrototype = newXML(XmlNode.createText(options, ""));
         xmlListPrototype = newXMLList();
-        namespacePrototype = Namespace.create(this.globalScope, null,
-                XmlNode.Namespace.GLOBAL);
-        qnamePrototype = QName.create(this, this.globalScope, null,
-                XmlNode.QName.create(XmlNode.Namespace.create(""), ""));
+        namespacePrototype = Namespace.create(this.globalScope, null, XmlNode.Namespace.GLOBAL);
+        qnamePrototype = QName.create(this, this.globalScope, null, XmlNode.QName.create(XmlNode.Namespace.create(""), ""));
 
         xmlPrototype.exportAsJSClass(sealed);
         xmlListPrototype.exportAsJSClass(sealed);
@@ -177,8 +174,7 @@ public final class XMLLibImpl extends XMLLib implements Serializable {
                 localName = ScriptRuntime.toString(nameValue);
             }
             if (localName != null && localName.equals("*")) localName = null;
-            return XMLName.create(XmlNode.QName.create(
-                    XmlNode.Namespace.create(""), localName), true, false);
+            return XMLName.create(XmlNode.QName.create(XmlNode.Namespace.create(""), localName), true, false);
         }
     }
 
@@ -387,8 +383,7 @@ public final class XMLLibImpl extends XMLLib implements Serializable {
     Namespace[] createNamespaces(XmlNode.Namespace[] declarations) {
         Namespace[] rv = new Namespace[declarations.length];
         for (int i=0; i<declarations.length; i++) {
-            rv[i] = this.namespacePrototype.newNamespace(
-                    declarations[i].getPrefix(), declarations[i].getUri());
+            rv[i] = this.namespacePrototype.newNamespace(declarations[i].getPrefix(), declarations[i].getUri());
         }
         return rv;
     }
@@ -446,18 +441,15 @@ public final class XMLLibImpl extends XMLLib implements Serializable {
 
     private XML parse(String frag) {
         try {
-            return newXML(XmlNode.createElement(options,
-                    getDefaultNamespaceURI(Context.getCurrentContext()), frag));
-        } catch (SAXException e) {
+            return newXML(XmlNode.createElement(options, getDefaultNamespaceURI(Context.getCurrentContext()), frag));
+        } catch (org.xml.sax.SAXException e) {
             throw ScriptRuntime.typeError("Cannot parse XML: " + e.getMessage());
         }
     }
 
     final XML ecmaToXml(Object object) {
         //    See ECMA357 10.3
-        if (object == null || object == Undefined.instance) {
-            throw ScriptRuntime.typeError("Cannot convert " + object + " to XML");
-        }
+        if (object == null || object == Undefined.instance) throw ScriptRuntime.typeError("Cannot convert " + object + " to XML");
         if (object instanceof XML) return (XML)object;
         if (object instanceof XMLList) {
             XMLList list = (XMLList)object;

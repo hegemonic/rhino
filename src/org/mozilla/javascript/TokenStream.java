@@ -295,7 +295,7 @@ class TokenStream
     }
 
     final String getSourceString() { return sourceString; }
-
+    
     final int getLineno() { return lineno; }
 
     final String getString() { return string; }
@@ -516,7 +516,7 @@ class TokenStream
                 if (base == 10 && !isInteger) {
                     try {
                         // Use Java conversion to number from string...
-                        dval = Double.parseDouble(numString);
+                        dval = Double.valueOf(numString).doubleValue();
                     }
                     catch (NumberFormatException ex) {
                         parser.addError("msg.caught.nfe");
@@ -1264,7 +1264,7 @@ class TokenStream
         stringBuffer[N] = (char)c;
         stringBufferTop = N + 1;
     }
-
+    
     private boolean canUngetChar() {
         return ungetCursor == 0 || ungetBuffer[ungetCursor - 1] != '\n';
     }

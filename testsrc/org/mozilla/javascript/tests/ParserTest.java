@@ -28,16 +28,6 @@ public class ParserTest extends TestCase {
         assertEquals("z", third.getString());
     }
 
-    public void testParseAutoSemiColonBeforeNewlineAndComments() throws IOException {
-        AstRoot root = parseAsReader(
-        		"var s = 3\n"
-        		+ "/* */var t = 1;");
-        assertNotNull(root.getComments());
-        assertEquals(1, root.getComments().size());
-
-        assertEquals("var s = 3;\nvar t = 1;\n", root.toSource());
-    }
-
     public void testLinenoAssign() {
         AstRoot root = parse("\n\na = b");
         ExpressionStatement st = (ExpressionStatement) root.getFirstChild();
@@ -939,9 +929,9 @@ public class ParserTest extends TestCase {
         }
         AstRoot root = parseAsReader(js);
     }
-
+    
     private AstRoot parse(String string) {
-        return parse(string, true);
+        return parse(string, true);    
     }
 
     private AstRoot parse(String string, boolean jsdoc) {

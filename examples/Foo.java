@@ -36,8 +36,6 @@
  * ***** END LICENSE BLOCK ***** */
 
 import org.mozilla.javascript.*;
-import org.mozilla.javascript.annotations.JSFunction;
-import org.mozilla.javascript.annotations.JSGetter;
 
 /**
  * An example host object class.
@@ -119,8 +117,7 @@ public class Foo extends ScriptableObject {
      *
      * Resets the counter to 0.
      */
-    @JSFunction
-    public void resetCounter() {
+    public void jsFunction_resetCounter() {
         counter = 0;
     }
 
@@ -130,8 +127,7 @@ public class Foo extends ScriptableObject {
      * If "setCounter" had been defined in this class, the runtime would
      * call the setter when the property is assigned to.
      */
-    @JSGetter
-    public int getCounter() {
+    public int jsGet_counter() {
         return counter++;
     }
 
@@ -151,8 +147,7 @@ public class Foo extends ScriptableObject {
      *
      * @see org.mozilla.javascript.ScriptableObject#getTopLevelScope
      */
-    @JSFunction
-    public static Object varargs(Context cx, Scriptable thisObj,
+    public static Object jsFunction_varargs(Context cx, Scriptable thisObj,
                                             Object[] args, Function funObj)
     {
         StringBuffer buf = new StringBuffer();

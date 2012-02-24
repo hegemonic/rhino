@@ -56,7 +56,7 @@ public class InterfaceAdapter
      * @return The glue object or null if <tt>cl</tt> is not interface or
      *         has methods with different signatures.
      */
-    static Object create(Context cx, Class<?> cl, ScriptableObject object)
+    static Object create(Context cx, Class<?> cl, Callable function)
     {
         if (!cl.isInterface()) throw new IllegalArgumentException();
 
@@ -67,32 +67,40 @@ public class InterfaceAdapter
         ContextFactory cf = cx.getFactory();
         if (adapter == null) {
             Method[] methods = cl.getMethods();
-            if ( object instanceof Callable) {
-                // Check if interface can be implemented by a single function.
-                // We allow this if the interface has only one method or multiple 
-                // methods with the same name (in which case they'd result in 
-                // the same function to be invoked anyway).
-                int length = methods.length;
-                if (length == 0) {
-                    throw Context.reportRuntimeError1(
-                        "msg.no.empty.interface.conversion", cl.getName());
-                }
-                if (length > 1) {
-                    String methodName = methods[0].getName();
-                    for (int i = 1; i < length; i++) {
-                        if (!methodName.equals(methods[i].getName())) {
-                            throw Context.reportRuntimeError1(
-                                    "msg.no.function.interface.conversion",
-                                    cl.getName());
+            if (methods.length == 0) {
+                throw Context.reportRuntimeError2(
+                    "msg.no.empty.interface.conversion",
+                    String.valueOf(function),
+                    cl.getClass().getName());
+            }
+            boolean canCallFunction = false;
+          canCallFunctionChecks: {
+                Class<?>[] argTypes = methods[0].getParameterTypes();
+                // check that the rest of methods has the same signature
+                for (int i = 1; i != methods.length; ++i) {
+                    Class<?>[] types2 = methods[i].getParameterTypes();
+                    if (types2.length != argTypes.length) {
+                        break canCallFunctionChecks;
+                    }
+                    for (int j = 0; j != argTypes.length; ++j) {
+                        if (types2[j] != argTypes[j]) {
+                            break canCallFunctionChecks;
                         }
                     }
                 }
+                canCallFunction= true;
+            }
+            if (!canCallFunction) {
+                throw Context.reportRuntimeError2(
+                    "msg.no.function.interface.conversion",
+                    String.valueOf(function),
+                    cl.getClass().getName());
             }
             adapter = new InterfaceAdapter(cf, cl);
             cache.cacheInterfaceAdapter(cl, adapter);
         }
         return VMBridge.instance.newInterfaceProxy(
-            adapter.proxyHelper, cf, adapter, object, topScope);
+            adapter.proxyHelper, cf, adapter, function, topScope);
     }
 
     private InterfaceAdapter(ContextFactory cf, Class<?> cl)
@@ -105,14 +113,13 @@ public class InterfaceAdapter
     public Object invoke(ContextFactory cf,
                          final Object target,
                          final Scriptable topScope,
-                         final Object thisObject,
                          final Method method,
                          final Object[] args)
     {
         ContextAction action = new ContextAction() {
                 public Object run(Context cx)
                 {
-                    return invokeImpl(cx, target, topScope, thisObject, method, args);
+                    return invokeImpl(cx, target, topScope, method, args);
                 }
             };
         return cf.call(action);
@@ -121,52 +128,23 @@ public class InterfaceAdapter
     Object invokeImpl(Context cx,
                       Object target,
                       Scriptable topScope,
-                      Object thisObject,
                       Method method,
                       Object[] args)
     {
-        Callable function;
-        if (target instanceof Callable) {
-            function = (Callable)target;
-        } else {
-            Scriptable s = (Scriptable)target;
-            String methodName = method.getName();
-            Object value = ScriptableObject.getProperty(s, methodName);
-            if (value == ScriptableObject.NOT_FOUND) {
-                // We really should throw an error here, but for the sake of
-                // compatibility with JavaAdapter we silently ignore undefined
-                // methods.
-                Context.reportWarning(ScriptRuntime.getMessage1(
-                        "msg.undefined.function.interface", methodName));
-                Class<?> resultType = method.getReturnType();
-                if (resultType == Void.TYPE) {
-                    return null;
-                } else {
-                    return Context.jsToJava(null, resultType);
-                }
-            }
-            if (!(value instanceof Callable)) {
-                throw Context.reportRuntimeError1(
-                        "msg.not.function.interface",methodName);
-            }
-            function = (Callable)value;
-        }
-        WrapFactory wf = cx.getWrapFactory();
-        if (args == null) {
-            args = ScriptRuntime.emptyArgs;
-        } else {
-            for (int i = 0, N = args.length; i != N; ++i) {
-                Object arg = args[i];
-                // neutralize wrap factory java primitive wrap feature
-                if (!(arg instanceof String || arg instanceof Number
-                        || arg instanceof Boolean)) {
-                    args[i] = wf.wrap(cx, topScope, arg, null);
-                }
-            }
-        }
-        Scriptable thisObj = wf.wrapAsJavaObject(cx, topScope, thisObject, null);
+        int N = (args == null) ? 0 : args.length;
 
-        Object result = function.call(cx, topScope, thisObj, args);
+        Callable function = (Callable)target;
+        Scriptable thisObj = topScope;
+        Object[] jsargs = new Object[N + 1];
+        jsargs[N] = method.getName();
+        if (N != 0) {
+            WrapFactory wf = cx.getWrapFactory();
+            for (int i = 0; i != N; ++i) {
+                jsargs[i] = wf.wrap(cx, topScope, args[i], null);
+            }
+        }
+
+        Object result = function.call(cx, topScope, thisObj, jsargs);
         Class<?> javaResultType = method.getReturnType();
         if (javaResultType == Void.TYPE) {
             result = null;

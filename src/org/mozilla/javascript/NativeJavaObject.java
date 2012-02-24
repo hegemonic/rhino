@@ -87,7 +87,7 @@ public class NativeJavaObject implements Scriptable, Wrapper, Serializable
         } else {
             dynamicType = staticType;
         }
-        members = JavaMembers.lookupClass(parent, dynamicType, staticType,
+        members = JavaMembers.lookupClass(parent, dynamicType, staticType, 
                                           isAdapter);
         fieldAndMethods
             = members.getFieldAndMethodsObjects(this, javaObject, false);
@@ -144,9 +144,7 @@ public class NativeJavaObject implements Scriptable, Wrapper, Serializable
 
     public Scriptable getPrototype() {
         if (prototype == null && javaObject instanceof String) {
-            return TopLevel.getBuiltinPrototype(
-                    ScriptableObject.getTopLevelScope(parent),
-                    TopLevel.Builtins.String);
+            return TopLevel.getBuiltinPrototype(parent, TopLevel.Builtins.String);
         }
         return prototype;
     }
@@ -381,14 +379,14 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
                     // This is a native array conversion to a java array
                     // Array conversions are all equal, and preferable to object
                     // and string conversion, per LC3.
-                    return 2;
+                    return 1;
                 }
             }
             else if (to == ScriptRuntime.ObjectClass) {
-                return 3;
+                return 2;
             }
             else if (to == ScriptRuntime.StringClass) {
-                return 4;
+                return 3;
             }
             else if (to == ScriptRuntime.DateClass) {
                 if (fromObj instanceof NativeDate) {
@@ -397,14 +395,16 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
                 }
             }
             else if (to.isInterface()) {
-                if (fromObj instanceof NativeObject || fromObj instanceof NativeFunction) {
-                    // See comments in createInterfaceAdapter
-                    return 1;
+                if (fromObj instanceof Function) {
+                    // See comments in coerceType
+                    if (to.getMethods().length == 1) {
+                        return 1;
+                    }
                 }
-                return 12;
+                return 11;
             }
             else if (to.isPrimitive() && to != Boolean.TYPE) {
-                return 4 + getSizeRank(to);
+                return 3 + getSizeRank(to);
             }
             break;
         }
@@ -449,7 +449,7 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
         else if (value == Undefined.instance) {
             return JSTYPE_UNDEFINED;
         }
-        else if (value instanceof CharSequence) {
+        else if (value instanceof String) {
             return JSTYPE_STRING;
         }
         else if (value instanceof Number) {
@@ -559,7 +559,7 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
 
         case JSTYPE_STRING:
             if (type == ScriptRuntime.StringClass || type.isInstance(value)) {
-                return value.toString();
+                return value;
             }
             else if (type == Character.TYPE
                      || type == ScriptRuntime.CharacterClass)
@@ -568,8 +568,8 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
                 // character
                 // Placed here because it applies *only* to JS strings,
                 // not other JS objects converted to strings
-                if (((CharSequence)value).length() == 1) {
-                    return Character.valueOf(((CharSequence)value).charAt(0));
+                if (((String)value).length() == 1) {
+                    return Character.valueOf(((String)value).charAt(0));
                 }
                 else {
                     return coerceToNumber(type, value);
@@ -603,7 +603,7 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
             break;
 
         case JSTYPE_JAVA_OBJECT:
-        case JSTYPE_JAVA_ARRAY:
+        case JSTYPE_JAVA_ARRAY:              
             if (value instanceof Wrapper) {
               value = ((Wrapper)value).unwrap();
             }
@@ -613,7 +613,7 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
                 }
                 return coerceToNumber(type, value);
             }
-            else {
+            else { 
               if (type == ScriptRuntime.StringClass) {
                     return value.toString();
                 }
@@ -657,8 +657,8 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
                 Object Result = Array.newInstance(arrayType, (int)length);
                 for (int i = 0 ; i < length ; ++i) {
                     try  {
-                        Array.set(Result, i, coerceTypeImpl(
-                                arrayType, array.get(i, array)));
+                        Array.set(Result, i, coerceType(arrayType,
+                                                        array.get(i, array)));
                     }
                     catch (EvaluatorException ee) {
                         reportConversionError(value, type);
@@ -673,10 +673,31 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
                     return value;
                 reportConversionError(value, type);
             }
-            else if (type.isInterface() && (value instanceof NativeObject
-                    || value instanceof NativeFunction)) {
-                // Try to use function/object as implementation of Java interface.
-                return createInterfaceAdapter(type, (ScriptableObject) value);
+            else if (type.isInterface() && value instanceof Callable) {
+                // Try to use function as implementation of Java interface.
+                //
+                // XXX: Currently only instances of ScriptableObject are
+                // supported since the resulting interface proxies should
+                // be reused next time conversion is made and generic
+                // Callable has no storage for it. Weak references can
+                // address it but for now use this restriction.
+                if (value instanceof ScriptableObject) {
+                    ScriptableObject so = (ScriptableObject)value;
+                    Object key = Kit.makeHashKeyFromPair(
+                        COERCED_INTERFACE_KEY, type);
+                    Object old = so.getAssociatedValue(key);
+                    if (old != null) {
+                        // Function was already wrapped
+                        return old;
+                    }
+                    Context cx = Context.getContext();
+                    Object glue
+                        = InterfaceAdapter.create(cx, type, (Callable)value);
+                    // Store for later retrival
+                    glue = so.associateValue(key, glue);
+                    return glue;
+                }
+                reportConversionError(value, type);
             } else {
                 reportConversionError(value, type);
             }
@@ -684,26 +705,6 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
         }
 
         return value;
-    }
-
-    protected static Object createInterfaceAdapter(Class<?>type, ScriptableObject so) {
-        // XXX: Currently only instances of ScriptableObject are
-        // supported since the resulting interface proxies should
-        // be reused next time conversion is made and generic
-        // Callable has no storage for it. Weak references can
-        // address it but for now use this restriction.
-
-        Object key = Kit.makeHashKeyFromPair(COERCED_INTERFACE_KEY, type);
-        Object old = so.getAssociatedValue(key);
-        if (old != null) {
-            // Function was already wrapped
-            return old;
-        }
-        Context cx = Context.getContext();
-        Object glue = InterfaceAdapter.create(cx, type, so);
-        // Store for later retrieval
-        glue = so.associateValue(key, glue);
-        return glue;
     }
 
     private static Object coerceToNumber(Class<?> type, Object value)
@@ -837,7 +838,7 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
         else {
             Method meth;
             try {
-                meth = value.getClass().getMethod("doubleValue",
+                meth = value.getClass().getMethod("doubleValue", 
                 		                          (Class [])null);
             }
             catch (NoSuchMethodException e) {
@@ -848,7 +849,7 @@ WrapFactory#wrap(Context, Scriptable, Object, Class)}
             }
             if (meth != null) {
                 try {
-                    return ((Number)meth.invoke(value,
+                    return ((Number)meth.invoke(value, 
                     		                    (Object [])null)).doubleValue();
                 }
                 catch (IllegalAccessException e) {

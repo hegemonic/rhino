@@ -617,9 +617,9 @@ class XmlNode implements Serializable {
         static Namespace create(String uri) {
             Namespace rv = new Namespace();
             rv.uri = uri;
-
+            
             // Avoid null prefix for "" namespace
-            if (uri == null || uri.length() == 0) {
+            if (uri.length() == 0) {
                 rv.prefix = "";
             }
 
@@ -729,7 +729,7 @@ class XmlNode implements Serializable {
             if (!equals(this.localName, other.localName)) return false;
             return true;
         }
-
+        
         @Override
         public boolean equals(Object obj) {
             if(!(obj instanceof QName)) {
@@ -737,7 +737,7 @@ class XmlNode implements Serializable {
             }
             return equals((QName)obj);
         }
-
+        
         @Override
         public int hashCode() {
             return localName == null ? 0 : localName.hashCode();

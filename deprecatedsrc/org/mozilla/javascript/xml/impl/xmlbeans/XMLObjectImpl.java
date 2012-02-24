@@ -143,6 +143,11 @@ abstract class XMLObjectImpl extends XMLObject
                                             Object[] args);
 
 
+    final Object getMethod(String id)
+    {
+        return super.get(id, this);
+    }
+
     //
     //
     // Methods overriding ScriptableObject
@@ -154,6 +159,10 @@ abstract class XMLObjectImpl extends XMLObject
         return toString();
     }
 
+    public void delete(String name)
+    {
+        throw new IllegalArgumentException("String: [" + name + "]");
+    }
 
     /**
      * XMLObject always compare with any value and equivalentValues
@@ -180,7 +189,7 @@ abstract class XMLObjectImpl extends XMLObject
     /**
      * Implementation of ECMAScript [[Has]]
      */
-    public final boolean has(Context cx, Object id)
+    public final boolean ecmaHas(Context cx, Object id)
     {
         if (cx == null) cx = Context.getCurrentContext();
         XMLName xmlName = lib.toXMLNameOrIndex(cx, id);
@@ -192,16 +201,10 @@ abstract class XMLObjectImpl extends XMLObject
         return hasXMLProperty(xmlName);
     }
 
-    @Override
-    public boolean has(String name, Scriptable start) {
-        Context cx = Context.getCurrentContext();
-        return hasXMLProperty(lib.toXMLNameFromString(cx, name));
-    }
     /**
      * Implementation of ECMAScript [[Get]]
      */
-    @Override
-    public final Object get(Context cx, Object id)
+    public final Object ecmaGet(Context cx, Object id)
     {
         if (cx == null) cx = Context.getCurrentContext();
         XMLName xmlName = lib.toXMLNameOrIndex(cx, id);
@@ -217,16 +220,10 @@ abstract class XMLObjectImpl extends XMLObject
         return getXMLProperty(xmlName);
     }
 
-    @Override
-    public Object get(String name, Scriptable start) {
-        Context cx = Context.getCurrentContext();
-        return getXMLProperty(lib.toXMLNameFromString(cx, name));
-    }
     /**
      * Implementation of ECMAScript [[Put]]
      */
-    @Override
-    public final void put(Context cx, Object id, Object value)
+    public final void ecmaPut(Context cx, Object id, Object value)
     {
         if (cx == null) cx = Context.getCurrentContext();
         XMLName xmlName = lib.toXMLNameOrIndex(cx, id);
@@ -239,16 +236,10 @@ abstract class XMLObjectImpl extends XMLObject
         putXMLProperty(xmlName, value);
     }
 
-    @Override
-    public void put(String name, Scriptable start, Object value) {
-        Context cx = Context.getCurrentContext();
-        putXMLProperty(lib.toXMLNameFromString(cx, name), value);
-    }
     /**
      * Implementation of ECMAScript [[Delete]].
      */
-    @Override
-    public final boolean delete(Context cx, Object id)
+    public final boolean ecmaDelete(Context cx, Object id)
     {
         if (cx == null) cx = Context.getCurrentContext();
         XMLName xmlName = lib.toXMLNameOrIndex(cx, id);
@@ -260,38 +251,6 @@ abstract class XMLObjectImpl extends XMLObject
         }
         deleteXMLProperty(xmlName);
         return true;
-    }
-
-    @Override
-    public void delete(String name) {
-        Context cx = Context.getCurrentContext();
-        deleteXMLProperty(lib.toXMLNameFromString(cx, name));
-    }
-
-    @Override
-    public Object getFunctionProperty(Context cx, int id) {
-        if (prototypeFlag) {
-            return super.get(id, this);
-        } else {
-            Scriptable proto = getPrototype();
-            if (proto instanceof XMLObject) {
-                return ((XMLObject)proto).getFunctionProperty(cx, id);
-            }
-        }
-        return NOT_FOUND;
-    }
-
-    @Override
-    public Object getFunctionProperty(Context cx, String name) {
-        if (prototypeFlag) {
-            return super.get(name, this);
-        } else {
-            Scriptable proto = getPrototype();
-            if (proto instanceof XMLObject) {
-                return ((XMLObject)proto).getFunctionProperty(cx, name);
-            }
-        }
-        return NOT_FOUND;
     }
 
     public Ref memberRef(Context cx, Object elem, int memberTypeFlags)

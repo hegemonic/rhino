@@ -45,9 +45,6 @@ package org.mozilla.javascript;
  * @author Raphael Speyer
  */
 public class BoundFunction extends BaseFunction {
-    
-  static final long serialVersionUID = 2118137342826470729L;
-    
   private final Callable targetFunction;
   private final Scriptable boundThis;
   private final Object[] boundArgs;
@@ -75,8 +72,8 @@ public class BoundFunction extends BaseFunction {
     throwing.put("configurable", throwing, false);
     throwing.preventExtensions();
 
-    this.defineOwnProperty(cx, "caller", throwing, false);
-    this.defineOwnProperty(cx, "arguments", throwing, false);
+    this.defineOwnProperty(cx, "caller", throwing);
+    this.defineOwnProperty(cx, "arguments", throwing);
   }
 
   @Override

@@ -406,14 +406,6 @@ public class FunctionObject extends BaseFunction
     {
         Object result;
         boolean checkMethodResult = false;
-        int argsLength = args.length;
-
-        for (int i = 0; i < argsLength; i++) {
-            // flatten cons-strings before passing them as arguments
-            if (args[i] instanceof ConsString) {
-                args[i] = args[i].toString();
-            }
-        }
 
         if (parmsLength < 0) {
             if (parmsLength == VARARGS_METHOD) {
@@ -454,7 +446,7 @@ public class FunctionObject extends BaseFunction
             }
 
             Object[] invokeArgs;
-            if (parmsLength == argsLength) {
+            if (parmsLength == args.length) {
                 // Do not allocate new argument array if java arguments are
                 // the same as the original js ones.
                 invokeArgs = args;
@@ -473,7 +465,7 @@ public class FunctionObject extends BaseFunction
             } else {
                 invokeArgs = new Object[parmsLength];
                 for (int i = 0; i != parmsLength; ++i) {
-                    Object arg = (i < argsLength)
+                    Object arg = (i < args.length)
                                  ? args[i]
                                  : Undefined.instance;
                     invokeArgs[i] = convertArg(cx, scope, arg, typeTags[i]);

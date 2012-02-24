@@ -1377,14 +1377,13 @@ switch (op) {
         stack[stackTop] = ScriptRuntime.setConst(lhs, rhs, cx, stringReg);
         continue Loop;
     }
-    case Token.DELPROP :
-    case Icode_DELNAME : {
+    case Token.DELPROP : {
         Object rhs = stack[stackTop];
         if (rhs == DBL_MRK) rhs = ScriptRuntime.wrapNumber(sDbl[stackTop]);
         --stackTop;
         Object lhs = stack[stackTop];
         if (lhs == DBL_MRK) lhs = ScriptRuntime.wrapNumber(sDbl[stackTop]);
-        stack[stackTop] = ScriptRuntime.delete(lhs, rhs, cx, op == Icode_DELNAME);
+        stack[stackTop] = ScriptRuntime.delete(lhs, rhs, cx);
         continue Loop;
     }
     case Token.GETPROPNOWARN : {
@@ -1678,7 +1677,7 @@ switch (op) {
             }
         }
 
-        // Bug 447697 -- make best effort to keep __noSuchMethod__ within this
+        // Bug 447697 -- make best effort to keep __noSuchMethod__ within this  
         // interpreter loop invocation
         if (fun instanceof NoSuchMethodShim) {
             // get the shim and the actual method
@@ -1699,7 +1698,7 @@ switch (op) {
         cx.lastInterpreterFrame = frame;
         frame.savedCallOp = op;
         frame.savedStackTop = stackTop;
-        stack[stackTop] = fun.call(cx, calleeScope, funThisObj,
+        stack[stackTop] = fun.call(cx, calleeScope, funThisObj, 
                 getArgsArray(stack, sDbl, stackTop + 2, indexReg));
 
         continue Loop;
@@ -2407,7 +2406,7 @@ switch (op) {
         argsArray = new Object[2];
         argsArray[0] = noSuchMethodShim.methodName;
         argsArray[1] = cx.newArray(calleeScope, elements);
-
+        
         // exactly the same as if it's a regular InterpretedFunction
         CallFrame callParentFrame = frame;
         CallFrame calleeFrame = new CallFrame();
@@ -2415,7 +2414,7 @@ switch (op) {
             callParentFrame = frame.parentFrame;
             exitFrame(cx, frame, null);
         }
-        // init the frame with the underlying method with the
+        // init the frame with the underlying method with the 
         // adjusted args array and shim's function
         initFrame(cx, calleeScope, funThisObj, argsArray, null,
           0, 2, ifun, callParentFrame, calleeFrame);
@@ -2425,7 +2424,7 @@ switch (op) {
         }
         return calleeFrame;
     }
-
+    
     private static boolean shallowEquals(Object[] stack, double[] sDbl,
             int stackTop)
     {
@@ -2676,7 +2675,11 @@ switch (op) {
 
         Scriptable scope;
         if (idata.itsFunctionType != 0) {
-            scope = fnOrScript.getParentScope();
+            if (!idata.useDynamicScope) {
+                scope = fnOrScript.getParentScope();
+            } else {
+                scope = callerScope;
+            }
 
             if (useActivation) {
                 scope = ScriptRuntime.createFunctionActivation(
@@ -2910,7 +2913,7 @@ switch (op) {
         }
         frame.savedCallOp = 0;
     }
-
+    
     public static NativeContinuation captureContinuation(Context cx) {
         if (cx.lastInterpreterFrame == null ||
             !(cx.lastInterpreterFrame instanceof CallFrame))
@@ -2950,11 +2953,11 @@ switch (op) {
             outermost = x;
             x = x.parentFrame;
         }
-
+        
         if (requireContinuationsTopFrame) {
             while (outermost.parentFrame != null)
                 outermost = outermost.parentFrame;
-
+    
             if (!outermost.isContinuationsTopFrame) {
                 throw new IllegalStateException("Cannot capture continuation " +
                         "from JavaScript code not called directly by " +
@@ -2962,7 +2965,7 @@ switch (op) {
                         "callFunctionWithContinuations");
             }
         }
-
+        
         c.initImplementation(frame);
         return c;
     }
@@ -3034,10 +3037,14 @@ switch (op) {
         } else {
             if (lhs instanceof Scriptable || rhs instanceof Scriptable) {
                 stack[stackTop] = ScriptRuntime.add(lhs, rhs, cx);
-            } else if (lhs instanceof CharSequence || rhs instanceof CharSequence) {
-                CharSequence lstr = ScriptRuntime.toCharSequence(lhs);
-                CharSequence rstr = ScriptRuntime.toCharSequence(rhs);
-                stack[stackTop] = new ConsString(lstr, rstr);
+            } else if (lhs instanceof String) {
+                String lstr = (String)lhs;
+                String rstr = ScriptRuntime.toString(rhs);
+                stack[stackTop] = lstr.concat(rstr);
+            } else if (rhs instanceof String) {
+                String lstr = ScriptRuntime.toString(lhs);
+                String rstr = (String)rhs;
+                stack[stackTop] = lstr.concat(rstr);
             } else {
                 double lDbl = (lhs instanceof Number)
                     ? ((Number)lhs).doubleValue() : ScriptRuntime.toNumber(lhs);
@@ -3058,13 +3065,13 @@ switch (op) {
                 rhs = tmp;
             }
             stack[stackTop] = ScriptRuntime.add(lhs, rhs, cx);
-        } else if (lhs instanceof CharSequence) {
-            CharSequence lstr = (CharSequence)lhs;
-            CharSequence rstr = ScriptRuntime.toCharSequence(d);
+        } else if (lhs instanceof String) {
+            String lstr = (String)lhs;
+            String rstr = ScriptRuntime.toString(d);
             if (leftRightOrder) {
-                stack[stackTop] = new ConsString(lstr, rstr);
+                stack[stackTop] = lstr.concat(rstr);
             } else {
-                stack[stackTop] = new ConsString(rstr, lstr);
+                stack[stackTop] = rstr.concat(lstr);
             }
         } else {
             double lDbl = (lhs instanceof Number)

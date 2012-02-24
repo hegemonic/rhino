@@ -139,12 +139,20 @@ class XML extends XMLObjectImpl {
 
     @Override
     boolean hasXMLProperty(XMLName xmlName) {
-        return (getPropertyList(xmlName).length() > 0);
+        if (isPrototype()) {
+            return getMethod(xmlName.localName()) != NOT_FOUND;
+        } else {
+            return (getPropertyList(xmlName).length() > 0) || (getMethod(xmlName.localName()) != NOT_FOUND);
+        }
     }
 
     @Override
     Object getXMLProperty(XMLName xmlName) {
-        return getPropertyList(xmlName);
+        if (isPrototype()) {
+            return getMethod(xmlName.localName());
+        } else {
+            return getPropertyList(xmlName);
+        }
     }
 
     //
@@ -341,13 +349,6 @@ class XML extends XMLObjectImpl {
             child.setXml(newXML(child));
         }
         return child.getXml();
-    }
-
-    /* Return the last added element */
-    XML getLastXmlChild() {
-        int pos = this.node.getChildCount() - 1;
-        if (pos < 0) return null;
-        return getXmlChild(pos);
     }
 
     int childIndex() {

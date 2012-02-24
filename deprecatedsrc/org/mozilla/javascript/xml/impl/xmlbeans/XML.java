@@ -59,7 +59,7 @@ class XML extends XMLObjectImpl
     final static class XScriptAnnotation extends XmlBookmark implements Serializable
     {
         private static final long serialVersionUID = 1L;
-
+        
         javax.xml.namespace.QName _name;
         XML _xScriptXML;
 
@@ -721,7 +721,7 @@ todo need to handle namespace prefix not found in XML look for namespace type in
             {
                 cursToCopy.toNextToken();
             }
-
+            
             cursToCopy.copyXml(copyCurs);
             if (!cursToCopy.toNextSibling())        // If element skip element.
             {
@@ -1152,13 +1152,36 @@ todo need to handle namespace prefix not found in XML look for namespace type in
     /**
      * Does the named property exist
      *
-     * @param xmlName
+     * @param name
+     * @param start
      * @return
      */
     boolean hasXMLProperty(XMLName xmlName)
     {
-        // Has now should return true if the property would have results > 0
-        return (getPropertyList(xmlName).length() > 0);
+        boolean result = false;
+
+        if (prototypeFlag)
+        {
+            String name = xmlName.localName();
+
+            if (getMethod(name) != NOT_FOUND)
+            {
+                result = true;
+            }
+        }
+        else
+        {
+            // Has now should return true if the property would have results > 0 or
+            // if it's a method name
+            String name = xmlName.localName();
+            if ((getPropertyList(xmlName).length() > 0) ||
+                (getMethod(name) != NOT_FOUND))
+            {
+                result = true;
+            }
+        }
+
+        return result;
     }
 
 
@@ -1207,17 +1230,32 @@ todo need to handle namespace prefix not found in XML look for namespace type in
 
     /**
      *
-     * @param xmlName
+     * @param name
+     * @param start
      * @return
      */
     Object getXMLProperty(XMLName xmlName)
     {
-        return getPropertyList(xmlName);
+        Object result = NOT_FOUND;
+
+        if (prototypeFlag)
+        {
+            String name = xmlName.localName();
+
+            result = getMethod(name);
+        }
+        else
+        {
+            result = getPropertyList(xmlName);
+        }
+
+        return result;
     }
 
     /**
      *
-     * @param xmlName
+     * @param name
+     * @param start
      * @param value
      */
     void putXMLProperty(XMLName xmlName, Object value)

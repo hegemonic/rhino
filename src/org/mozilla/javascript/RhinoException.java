@@ -333,7 +333,7 @@ public abstract class RhinoException extends RuntimeException
     }
 
     /**
-     * Returns true if subclasses of <code>RhinoException</code>
+     * Returns true if subclasses of <code>RhinoException</code>   
      * use the Mozilla/Firefox style of rendering script stacks
      * (<code>functionName()@fileName:lineNumber</code>)
      * instead of Rhino's own Java-inspired format
@@ -360,8 +360,6 @@ public abstract class RhinoException extends RuntimeException
         useMozillaStackStyle = flag;
     }
 
-    static final long serialVersionUID = 1883500631321581169L;
-    
     private static boolean useMozillaStackStyle = false;
 
     private String sourceName;

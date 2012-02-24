@@ -51,7 +51,8 @@ public class CompilerEnvirons
         errorReporter = DefaultErrorReporter.instance;
         languageVersion = Context.VERSION_DEFAULT;
         generateDebugInfo = true;
-        reservedKeywordAsIdentifier = true;
+        useDynamicScope = false;
+        reservedKeywordAsIdentifier = false;
         allowMemberExprAsFunctionName = false;
         xmlAvailable = true;
         optimizationLevel = 0;
@@ -66,6 +67,7 @@ public class CompilerEnvirons
     {
         setErrorReporter(cx.getErrorReporter());
         this.languageVersion = cx.getLanguageVersion();
+        useDynamicScope = cx.compileFunctionsWithDynamicScopeFlag;
         generateDebugInfo = (!cx.isGeneratingDebugChanged()
                              || cx.isGeneratingDebug());
         reservedKeywordAsIdentifier
@@ -82,7 +84,7 @@ public class CompilerEnvirons
 
         generatingSource = cx.isGeneratingSource();
         activationNames = cx.activationNames;
-
+        
         // Observer code generation in compiled code :
         generateObserverCount = cx.generateObserverCount;
     }
@@ -117,6 +119,11 @@ public class CompilerEnvirons
     public void setGenerateDebugInfo(boolean flag)
     {
         this.generateDebugInfo = flag;
+    }
+
+    public final boolean isUseDynamicScope()
+    {
+        return useDynamicScope;
     }
 
     public final boolean isReservedKeywordAsIdentifier()
@@ -211,10 +218,10 @@ public class CompilerEnvirons
      * instruction thresholds
      */
     public boolean isGenerateObserverCount() {
-        return generateObserverCount;
+    	return generateObserverCount;
     }
 
-    /**
+   /**
      * Turn on or off generation of code with callbacks to
      * track the count of executed instructions.
      * Currently only affects JVM byte code generation: this slows down the
@@ -295,22 +302,23 @@ public class CompilerEnvirons
      * The {@link ErrorReporter} is set to an {@link ErrorCollector}.
      */
     public static CompilerEnvirons ideEnvirons() {
-        CompilerEnvirons env = new CompilerEnvirons();
-        env.setRecoverFromErrors(true);
-        env.setRecordingComments(true);
-        env.setStrictMode(true);
-        env.setWarnTrailingComma(true);
-        env.setLanguageVersion(170);
-        env.setReservedKeywordAsIdentifier(true);
-        env.setIdeMode(true);
-        env.setErrorReporter(new ErrorCollector());
-        return env;
+      CompilerEnvirons env = new CompilerEnvirons();
+      env.setRecoverFromErrors(true);
+      env.setRecordingComments(true);
+      env.setStrictMode(true);
+      env.setWarnTrailingComma(true);
+      env.setLanguageVersion(170);
+      env.setReservedKeywordAsIdentifier(true);
+      env.setIdeMode(true);
+      env.setErrorReporter(new ErrorCollector());
+      return env;
     }
 
     private ErrorReporter errorReporter;
 
     private int languageVersion;
     private boolean generateDebugInfo;
+    private boolean useDynamicScope;
     private boolean reservedKeywordAsIdentifier;
     private boolean allowMemberExprAsFunctionName;
     private boolean xmlAvailable;

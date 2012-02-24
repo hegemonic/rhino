@@ -56,7 +56,7 @@ public class BaseFunction extends IdScriptableObject implements Function
     static void init(Scriptable scope, boolean sealed)
     {
         BaseFunction obj = new BaseFunction();
-        // Function.prototype attributes: see ECMA 15.3.3.1
+        // Function.prototype attributes: see ECMA 15.3.3.1 
         obj.prototypePropertyAttributes = DONTENUM | READONLY | PERMANENT;
         obj.exportAsJSClass(MAX_PROTOTYPE_ID, scope, sealed);
     }
@@ -74,9 +74,9 @@ public class BaseFunction extends IdScriptableObject implements Function
     public String getClassName() {
         return "Function";
     }
-
+    
     /**
-     * Gets the value returned by calling the typeof operator on this object.
+     * Gets the value returned by calling the typeof operator on this object. 
      * @see org.mozilla.javascript.ScriptableObject#getTypeOf()
      * @return "function" or "undefined" if {@link #avoidObjectDetection()} returns <code>true</code>
      */
@@ -159,10 +159,6 @@ public class BaseFunction extends IdScriptableObject implements Function
             attr = DONTENUM | READONLY | PERMANENT;
             break;
           case Id_prototype:
-            // some functions such as built-ins don't have a prototype property
-            if (!hasPrototypeProperty()) {
-                return 0;
-            }
             attr = prototypePropertyAttributes;
             break;
           case Id_arguments:
@@ -254,7 +250,7 @@ public class BaseFunction extends IdScriptableObject implements Function
     static boolean isApply(IdFunctionObject f) {
         return f.hasTag(FUNCTION_TAG) && f.methodId() == Id_apply;
     }
-
+    
     static boolean isApplyOrCall(IdFunctionObject f) {
         if(f.hasTag(FUNCTION_TAG)) {
             switch(f.methodId()) {
@@ -445,34 +441,28 @@ public class BaseFunction extends IdScriptableObject implements Function
 
     public int getLength() { return 0; }
 
-    public String getFunctionName() {
+    public String getFunctionName()
+    {
         return "";
     }
 
-    protected boolean hasPrototypeProperty() {
-        return prototypeProperty != null || this instanceof NativeFunction;
-    }
-
-    protected Object getPrototypeProperty() {
+    final Object getPrototypeProperty() {
         Object result = prototypeProperty;
         if (result == null) {
-            // only create default prototype on native JavaScript functions,
-            // not on built-in functions, java methods, host objects etc.
-            if (this instanceof NativeFunction) {
-                result = setupDefaultPrototype();
-            } else {
-                result = Undefined.instance;
+            synchronized (this) {
+                result = prototypeProperty;
+                if (result == null) {
+                    setupDefaultPrototype();
+                    result = prototypeProperty;
+                }
             }
-        } else if (result == UniqueTag.NULL_VALUE) {
-            result = null;
         }
+        else if (result == UniqueTag.NULL_VALUE) { result = null; }
         return result;
     }
 
-    private synchronized Object setupDefaultPrototype() {
-        if (prototypeProperty != null) {
-            return prototypeProperty;
-        }
+    private void setupDefaultPrototype()
+    {
         NativeObject obj = new NativeObject();
         final int attr = ScriptableObject.DONTENUM;
         obj.defineProperty("constructor", this, attr);
@@ -485,7 +475,6 @@ public class BaseFunction extends IdScriptableObject implements Function
             // not the one we just made, it must remain grounded
             obj.setPrototype(proto);
         }
-        return obj;
     }
 
     private Object getArguments()
@@ -561,7 +550,7 @@ public class BaseFunction extends IdScriptableObject implements Function
         Evaluator evaluator = Context.createInterpreter();
         if (evaluator == null) {
             throw new JavaScriptException("Interpreter not present",
-                    filename, linep[0]);
+                    filename, linep[0]);            
         }
 
         // Compile with explicit interpreter instance to force interpreter
@@ -610,7 +599,7 @@ public class BaseFunction extends IdScriptableObject implements Function
 
     private Object prototypeProperty;
     // For function object instances, attributes are
-    //  {configurable:false, enumerable:false};
+    //  {configurable:false, enumerable:false}; 
     // see ECMA 15.3.5.2
     private int prototypePropertyAttributes = PERMANENT|DONTENUM;
 }
