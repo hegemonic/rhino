@@ -82,9 +82,11 @@ public class ScriptRuntime {
     public static BaseFunction typeErrorThrower() {
       if (THROW_TYPE_ERROR == null) {
         BaseFunction thrower = new BaseFunction() {
+          
           static final long serialVersionUID = -5891740962154902286L;
-
-          @Override
+          
+            
+            @Override
           public Object call(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
             throw typeError0("msg.op.not.allowed");
           }
@@ -3033,7 +3035,7 @@ public class ScriptRuntime {
     public static boolean in(Object a, Object b, Context cx)
     {
         if (!(b instanceof Scriptable)) {
-            throw typeError0("msg.in.not.object");
+            throw typeError0("msg.instanceof.not.object");
         }
 
         return hasObjectElem((Scriptable)b, a, cx);

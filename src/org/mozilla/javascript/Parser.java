@@ -23,16 +23,14 @@
  *
  * Contributor(s):
  *   Mike Ang
- *   Norris Boyd
  *   Igor Bukanov
  *   Yuh-Ruey Chen
- *   Travis Ennis
  *   Ethan Hugg
  *   Bob Jervis
  *   Terry Lucas
  *   Mike McCabe
  *   Milen Nankov
- *   Hannes Wallnoefer
+ *   Norris Boyd
  *   Steve Yegge
  *
  * Alternatively, the contents of this file may be used under the terms of
@@ -687,7 +685,7 @@ public class Parser
         return null;
     }
 
-    private void  parseFunctionParams(FunctionNode fnNode)
+    private void parseFunctionParams(FunctionNode fnNode)
         throws IOException
     {
         if (matchToken(Token.RP)) {
@@ -2420,21 +2418,9 @@ public class Parser
         inForInit = false;
         try {
             do {
-                if (peekToken() == Token.YIELD) {
+                if (peekToken() == Token.YIELD)
                     reportError("msg.yield.parenthesized");
-                }
-                AstNode en = assignExpr();
-                if (peekToken() == Token.FOR) {
-                    try {
-                        result.add(generatorExpression(en, 0, true));
-                    }
-                    catch(IOException ex) {
-                        // #TODO
-                    }
-                }
-                else {                           
-                    result.add(en);
-                }
+                result.add(assignExpr());
             } while (matchToken(Token.COMMA));
         } finally {
             inForInit = wasInForInit;
@@ -2572,14 +2558,6 @@ public class Parser
                   // Assign the line number for the function call to where
                   // the paren appeared, not where the name expression started.
                   f.setLineno(lineno);
-                  // If there is a JSDoc, snag it.  This could be documentation
-                  // for a class factory function call -- e.g $.widget(...) from
-                  // jQuery UI or $.Model("MyClass").  And it's doubtful the 
-                  // comment was meant for anything else.
-                  String jsdoc = getAndResetJsDoc();
-                  if (jsdoc != null) {
-                	  f.setJsDoc(jsdoc);
-                  }
                   f.setLp(ts.tokenBeg - pos);
                   List<AstNode> args = argumentList();
                   if (args != null && args.size() > ARGC_LIMIT)
@@ -2890,11 +2868,7 @@ public class Parser
         try {
             String jsdoc = getAndResetJsDoc();
             int lineno = ts.lineno;
-            int begin = ts.tokenBeg;
             AstNode e = expr();
-            if (peekToken() == Token.FOR) {
-                return generatorExpression(e, begin);
-            }
             ParenthesizedExpression pn = new ParenthesizedExpression(e);
             if (jsdoc == null) {
                 jsdoc = getAndResetJsDoc();
@@ -3083,96 +3057,6 @@ public class Parser
             pn.setInPosition(inPos);
             pn.setEachPosition(eachPos);
             pn.setIsForEach(eachPos != -1);
-            pn.setParens(lp, rp);
-            return pn;
-        } finally {
-            popScope();
-        }
-    }
-
-    private AstNode generatorExpression(AstNode result, int pos) 
-        throws IOException
-    {
-        return generatorExpression(result, pos, false);
-    }
-    
-    private AstNode generatorExpression(AstNode result, int pos, boolean inFunctionParams)
-        throws IOException
-    {
-        
-        List<GeneratorExpressionLoop> loops =
-                new ArrayList<GeneratorExpressionLoop>();
-        while (peekToken() == Token.FOR) {
-            loops.add(generatorExpressionLoop());
-        }
-        int ifPos = -1;
-        ConditionData data = null;
-        if (peekToken() == Token.IF) {
-            consumeToken();
-            ifPos = ts.tokenBeg - pos;
-            data = condition();
-        }
-        if(!inFunctionParams) {
-            mustMatchToken(Token.RP, "msg.no.paren.let");
-        }
-        GeneratorExpression pn = new GeneratorExpression(pos, ts.tokenEnd - pos);
-        pn.setResult(result);
-        pn.setLoops(loops);
-        if (data != null) {
-            pn.setIfPosition(ifPos);
-            pn.setFilter(data.condition);
-            pn.setFilterLp(data.lp - pos);
-            pn.setFilterRp(data.rp - pos);
-        }
-        return pn;
-    }
-        
-    private GeneratorExpressionLoop generatorExpressionLoop()
-        throws IOException
-    {
-        if (nextToken() != Token.FOR) codeBug();
-        int pos = ts.tokenBeg;
-        int lp = -1, rp = -1, inPos = -1;
-        GeneratorExpressionLoop pn = new GeneratorExpressionLoop(pos);
-
-        pushScope(pn);
-        try {
-            if (mustMatchToken(Token.LP, "msg.no.paren.for")) {
-                lp = ts.tokenBeg - pos;
-            }
-
-            AstNode iter = null;
-            switch (peekToken()) {
-              case Token.LB:
-              case Token.LC:
-                  // handle destructuring assignment
-                  iter = destructuringPrimaryExpr();
-                  markDestructuring(iter);
-                  break;
-              case Token.NAME:
-                  consumeToken();
-                  iter = createNameNode();
-                  break;
-              default:
-                  reportError("msg.bad.var");
-            }
-
-            // Define as a let since we want the scope of the variable to
-            // be restricted to the array comprehension
-            if (iter.getType() == Token.NAME) {
-                defineSymbol(Token.LET, ts.getString(), true);
-            }
-
-            if (mustMatchToken(Token.IN, "msg.in.after.for.name"))
-                inPos = ts.tokenBeg - pos;
-            AstNode obj = expr();
-            if (mustMatchToken(Token.RP, "msg.no.paren.for.ctrl"))
-                rp = ts.tokenBeg - pos;
-
-            pn.setLength(ts.tokenEnd - pos);
-            pn.setIterator(iter);
-            pn.setIteratedObject(obj);
-            pn.setInPosition(inPos);
             pn.setParens(lp, rp);
             return pn;
         } finally {
