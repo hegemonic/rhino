@@ -5,7 +5,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import org.jsdoc.SourceReader;
+import org.jsdoc.JsDocSourceReader;
 import org.mozilla.javascript.commonjs.module.provider.UrlModuleSourceProvider;
 import org.mozilla.javascript.json.JsonParser;
 import org.mozilla.javascript.json.JsonParser.ParseException;
@@ -101,7 +101,7 @@ public class JsDocModuleProvider extends UrlModuleSourceProvider {
 	}
 
 	private NativeObject parsePackageFile(File packageFile) throws IOException, ParseException {
-		String packageJson = SourceReader.readFileOrUrl(packageFile.toString(), true, "UTF-8").
+		String packageJson = JsDocSourceReader.readFileOrUrl(packageFile.toString(), true, "UTF-8").
 			toString();
 
 		Context cx = Context.enter();
