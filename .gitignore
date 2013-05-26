@@ -3,3 +3,4 @@ lib
 build.local.properties
 downloaded
 rhino1_7R3.zip
+*.class
